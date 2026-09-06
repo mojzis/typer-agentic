@@ -17,5 +17,5 @@ fi
 # Remote-only setup (Claude Code on the web)
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
   uv sync --quiet
-  bash scripts/install-hooks.sh
+  uv run madoqua install
 fi

@@ -1,4 +1,4 @@
-"""Best-candidate ranking for the single corrected example."""
+"""Best-candidate ranking for the single corrected example shown to the agent."""
 
 from __future__ import annotations
 
