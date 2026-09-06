@@ -13,6 +13,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # typer forces rich terminal output (ANSI + panels) when GITHUB_ACTIONS is set;
+  # tests assert on plain text.
+  _TYPER_FORCE_DISABLE_TERMINAL: "1"
+
 jobs:
   lint:
     name: Lint
