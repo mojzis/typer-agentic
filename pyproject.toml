@@ -20,7 +20,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "typer>=0.15.0",
+    "typer>=0.24",
 ]
 
 [project.urls]
@@ -58,7 +58,7 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "DTZ", "T20", "PTH", "ERA", "PL", "TRY", "RUF", "S", "PERF", "FURB"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["PLR2004", "PLR0913", "S"]
+"tests/**" = ["PLR2004", "PLR0913", "S", "TRY003", "PLC0415", "E501", "B006", "B008"]
 
 [tool.ruff.format]
 
@@ -79,8 +79,7 @@ paths = ["src"]
 min_confidence = 80
 
 [tool.deptry]
-# TODO remove once src/ actually imports typer
-per_rule_ignores = { "DEP002" = ["typer"] }
+known_first_party = ["typer_agentic"]
 
 [tool.poe]
 verbosity = -1
@@ -107,6 +106,11 @@ help = "Run tests (parallel)"
 [tool.poe.tasks.test-quick]
 cmd = "pytest -o addopts= -x -qq --tb=line --no-header -n auto"
 help = "Fail-fast tests: no coverage, minimal output, parallel (used by `check`)"
+
+[tool.poe.tasks.test-compat]
+shell = "uv run --no-project --refresh-package typer-agentic --with 'typer==0.25.*' --with pytest --with . pytest tests -q -o addopts= -p no:cacheprovider"
+interpreter = "bash"
+help = "Run the suite against Typer 0.25 (external Click) — the pre-vendoring baseline"
 
 [tool.poe.tasks.vulns]
 shell = "uvx pysentry-rs --compact . || true"

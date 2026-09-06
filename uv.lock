@@ -575,7 +575,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typer", specifier = ">=0.15.0" }]
+requires-dist = [{ name = "typer", specifier = ">=0.24" }]
 
 [package.metadata.requires-dev]
 dev = [

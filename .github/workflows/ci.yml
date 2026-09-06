@@ -93,3 +93,11 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync --frozen
       - run: uv run pytest -q --tb=short
+
+  test-compat:
+    name: Test (typer 0.25, external click)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --no-project --with "typer==0.25.*" --with pytest --with . pytest tests -q -o addopts= -p no:cacheprovider

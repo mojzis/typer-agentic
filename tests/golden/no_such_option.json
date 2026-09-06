@@ -1,0 +1,78 @@
+{
+  "error": {
+    "type": "no_such_option",
+    "message": "No such option: --verbos",
+    "offending": "--verbos",
+    "param": null
+  },
+  "command_path": "myapp sync",
+  "recovery": {
+    "classification": "This is a recoverable input mistake, not a bug in the tool.",
+    "directive": "Do not switch tools, edit files or state to work around it, or invent flags; apply the one change below and re-run the command.",
+    "action": "Replace '--verbos' with '--verbose'. Run the corrected example.",
+    "escalation": null
+  },
+  "exit_code": 2,
+  "schema": "typer-agentic/v1",
+  "suggestions": [
+    "--verbose"
+  ],
+  "valid_arguments": [
+    {
+      "name": "path",
+      "metavar": "PATH",
+      "type": "PATH",
+      "required": true,
+      "nargs": 1,
+      "help": "Where to sync.",
+      "choices": null
+    }
+  ],
+  "valid_options": [
+    {
+      "names": [
+        "--verbose",
+        "-v"
+      ],
+      "type": "BOOL",
+      "required": false,
+      "default": false,
+      "multiple": false,
+      "is_flag": true,
+      "choices": null,
+      "help": "Enable verbose output.",
+      "nargs": 1
+    },
+    {
+      "names": [
+        "--count"
+      ],
+      "type": "INTEGER",
+      "required": false,
+      "default": 1,
+      "multiple": false,
+      "is_flag": false,
+      "choices": null,
+      "help": "How many.",
+      "nargs": 1
+    },
+    {
+      "names": [
+        "--env"
+      ],
+      "type": "CHOICE",
+      "required": false,
+      "default": "dev",
+      "multiple": false,
+      "is_flag": false,
+      "choices": [
+        "dev",
+        "prod"
+      ],
+      "help": "Target environment.",
+      "nargs": 1
+    }
+  ],
+  "subcommands": null,
+  "example": "myapp sync ./PATH --verbose"
+}
