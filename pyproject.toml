@@ -1,6 +1,6 @@
 [project]
 name = "typer-agentic"
-version = "0.1.0"
+version = "0.1.1"
 description = "Typer extension that makes CLIs friendly to coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
