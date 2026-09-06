@@ -36,7 +36,7 @@ def rank(
             )
         ]
     unique = list(dict.fromkeys(picked))
-    primary_set = set(primary)
+    primary_set = frozenset(primary)
 
     def key(candidate: str) -> tuple[float, int, int, str]:
         ratio = difflib.SequenceMatcher(None, offending, candidate).ratio()
