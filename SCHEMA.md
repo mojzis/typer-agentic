@@ -2,7 +2,7 @@
 
 Emitted when the agent-mode format is `json`. One UTF-8 JSON object, `indent=2`, newline-terminated, the only thing written to the configured stream. Additive-only after 0.1.0: new keys may appear, existing keys keep their meaning.
 
-The dataclasses in `typer_agentic.payload` (`ErrorPayload`, `ErrorInfo`, `ArgumentInfo`, `OptionInfo`, `SubcommandInfo`, `RecoveryCopy`) are the source of truth and are exported for downstream typing.
+The dataclasses in `typer_agentic.payload` (`ErrorPayload`, `ErrorInfo`, `ArgumentInfo`, `OptionInfo`, `RangeInfo`, `SubcommandInfo`, `RecoveryCopy`) are the source of truth and are exported for downstream typing.
 
 ```jsonc
 {
@@ -24,12 +24,16 @@ The dataclasses in `typer_agentic.payload` (`ErrorPayload`, `ErrorInfo`, `Argume
   "suggestions": ["--verbose"],     // best first, at most max_suggestions
   "valid_arguments": [
     {"name": "path", "metavar": "PATH", "type": "PATH", "required": true,
-     "nargs": 1, "help": "Where to sync.", "choices": null}
+     "nargs": 1, "help": "Where to sync.", "choices": null, "range": null}
   ],
   "valid_options": [
     {"names": ["--verbose", "-v"], "type": "BOOL", "required": false,
      "default": false, "multiple": false, "is_flag": true, "choices": null,
-     "help": "Enable verbose output.", "nargs": 1}
+     "help": "Enable verbose output.", "nargs": 1, "range": null},
+    {"names": ["--retries"], "type": "INTEGER RANGE", "required": false,
+     "default": 0, "multiple": false, "is_flag": false, "choices": null,
+     "help": "Retry budget.", "nargs": 1,
+     "range": {"min": 0, "max": 5, "min_open": false, "max_open": false}}
   ],
   "subcommands": null,              // [{"name", "help"}] for group-level errors
   "example": "myapp sync ./PATH --verbose"   // null when introspection failed
@@ -52,6 +56,6 @@ The dataclasses in `typer_agentic.payload` (`ErrorPayload`, `ErrorInfo`, `Argume
 
 ## Types
 
-`type` is normalised across Typer/Click versions: `INTEGER`, `FLOAT`, `TEXT`, `BOOL`, `CHOICE`, `PATH`, `FILE`, `UUID`, `DATETIME`, `INTEGER RANGE`, `FLOAT RANGE`; anything else is Click's type name upper-cased. `choices` is populated for `CHOICE` (including `typing.Literal` and `Enum` params).
+`type` is normalised across Typer/Click versions: `INTEGER`, `FLOAT`, `TEXT`, `BOOL`, `CHOICE`, `PATH`, `FILE`, `UUID`, `DATETIME`, `INTEGER RANGE`, `FLOAT RANGE`; anything else is Click's type name upper-cased. `choices` is populated for `CHOICE` (including `typing.Literal` and `Enum` params). `range` is populated for `INTEGER RANGE` / `FLOAT RANGE` (`typer.Option(min=..., max=...)`): `min`/`max` are `null` when unbounded, `min_open`/`max_open` mark exclusive bounds. The markdown renderer shows it as `INTEGER[1..]`, `INTEGER[1..365]`, `FLOAT[0.0..1.0]`; an exclusive bound gets `>`/`<`, e.g. `INTEGER[>0..]`.
 
 `default` is JSON-safe: scalars as-is, paths and enums as strings, sequences as lists, `repr()` otherwise; `null` for required params, callables and `...`.

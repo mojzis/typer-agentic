@@ -22,6 +22,7 @@ from .payload import (
     ErrorInfo,
     ErrorPayload,
     OptionInfo,
+    RangeInfo,
     RecoveryCopy,
     SubcommandInfo,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "ErrorInfo",
     "ErrorPayload",
     "OptionInfo",
+    "RangeInfo",
     "RecoveryCopy",
     "SubcommandInfo",
     "agent_errors",

@@ -25,7 +25,8 @@
       "required": true,
       "nargs": 1,
       "help": "Where to sync.",
-      "choices": null
+      "choices": null,
+      "range": null
     }
   ],
   "valid_options": [
@@ -41,7 +42,8 @@
       "is_flag": true,
       "choices": null,
       "help": "Enable verbose output.",
-      "nargs": 1
+      "nargs": 1,
+      "range": null
     },
     {
       "names": [
@@ -54,7 +56,8 @@
       "is_flag": false,
       "choices": null,
       "help": "How many.",
-      "nargs": 1
+      "nargs": 1,
+      "range": null
     },
     {
       "names": [
@@ -70,7 +73,8 @@
         "prod"
       ],
       "help": "Target environment.",
-      "nargs": 1
+      "nargs": 1,
+      "range": null
     }
   ],
   "subcommands": null,

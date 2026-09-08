@@ -12,7 +12,7 @@ from __future__ import annotations
 import importlib
 import sys
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -36,7 +36,10 @@ else:
     _DEV_ATTR = _typer_developer_exception_attr_name
     _typer_except_hook = except_hook
 
-_EXCEPTION_MODULES = ("typer._click.exceptions", "click.exceptions")
+_VENDORED = "typer._click.exceptions"
+_EXTERNAL = "click.exceptions"
+_EXTERNAL_PACKAGE = "click"
+_EXCEPTION_MODULES = (_VENDORED, _EXTERNAL)
 _REQUIRED = (
     "UsageError",
     "BadParameter",
@@ -58,6 +61,8 @@ class CompatStatus:
     reason: str = ""
     sources: tuple[str, ...] = ()
     classes: dict[str, tuple[type[BaseException], ...]] = field(default_factory=dict)
+    tried: tuple[str, ...] = ()
+    """Every module resolution attempted, whether or not it was usable."""
 
     def get(self, name: str) -> tuple[type[BaseException], ...]:
         """Every resolvable class with this name, across all hierarchies."""
@@ -66,12 +71,23 @@ class CompatStatus:
 
 def resolve(
     import_module: Callable[[str], ModuleType] = importlib.import_module,
+    *,
+    modules: Mapping[str, Any] = sys.modules,
 ) -> CompatStatus:
-    """Collect exception classes from every importable Click hierarchy."""
+    """Collect exception classes from every relevant Click hierarchy.
+
+    External ``click`` is imported only when Typer does not vendor Click or
+    when something else already imported it (``modules``): a Typer >= 0.26
+    app never raises external Click exceptions on its own.
+    """
     classes: dict[str, list[type[BaseException]]] = {n: [] for n in _ALL_NAMES}
     sources: list[str] = []
+    tried: list[str] = []
     problems: list[str] = []
     for modname in _EXCEPTION_MODULES:
+        if modname == _EXTERNAL and sources and _EXTERNAL_PACKAGE not in modules:
+            continue
+        tried.append(modname)
         try:
             mod = import_module(modname)
         except Exception as exc:
@@ -91,11 +107,12 @@ def resolve(
         if cls is not None and cls not in classes[name]:
             classes[name].append(cls)
     if not sources:
-        return CompatStatus(ok=False, reason="; ".join(problems))
+        return CompatStatus(ok=False, reason="; ".join(problems), tried=tuple(tried))
     return CompatStatus(
         ok=True,
         sources=tuple(sources),
         classes={n: tuple(v) for n, v in classes.items()},
+        tried=tuple(tried),
     )
 
 
@@ -112,9 +129,17 @@ def _typer_signal(
 STATUS: CompatStatus = resolve()
 
 
+def current() -> CompatStatus:
+    """``STATUS``, re-resolved once external ``click`` shows up after import."""
+    global STATUS  # noqa: PLW0603 - lazy pickup of a late external-click import
+    if STATUS.ok and _EXTERNAL not in STATUS.tried and _EXTERNAL_PACKAGE in sys.modules:
+        STATUS = resolve()
+    return STATUS
+
+
 def is_usage_error(exc: BaseException) -> bool:
     """True if ``exc`` is a UsageError from any resolvable Click hierarchy."""
-    return isinstance(exc, STATUS.get("UsageError"))
+    return isinstance(exc, current().get("UsageError"))
 
 
 def get_command(app: Any) -> Any:

@@ -29,6 +29,16 @@ class ErrorInfo:
 
 
 @dataclass(frozen=True)
+class RangeInfo:
+    """Bounds of a Click ``IntRange``/``FloatRange``; ``None`` means unbounded."""
+
+    min: int | float | None = None
+    max: int | float | None = None
+    min_open: bool = False
+    max_open: bool = False
+
+
+@dataclass(frozen=True)
 class ArgumentInfo:
     name: str
     metavar: str
@@ -37,6 +47,7 @@ class ArgumentInfo:
     nargs: int
     help: str | None = None
     choices: list[str] | None = None
+    range: RangeInfo | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +61,7 @@ class OptionInfo:
     choices: list[str] | None = None
     help: str | None = None
     nargs: int = 1
+    range: RangeInfo | None = None
     primary: list[str] = field(default_factory=list)
     """The ``opts`` subset of ``names`` (excludes ``--no-*`` secondaries)."""
 

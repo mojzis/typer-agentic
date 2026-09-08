@@ -10,7 +10,8 @@ from .example import build_example
 from .payload import ArgumentInfo, OptionInfo
 from .render.markdown import align, option_names, option_type_label, type_label
 
-MAX_FULL_COMMANDS = 10
+MAX_FULL_HELP_COMMANDS = 10
+"""Above this many commands only the first line of each command's help is kept."""
 MAX_DESCRIPTION = 1024  # Agent Skills frontmatter limit for `description`
 
 
@@ -42,7 +43,7 @@ def _arguments_block(arguments: list[ArgumentInfo]) -> list[str]:
     rows = (
         (
             a.metavar,
-            type_label(a.type, a.choices),
+            type_label(a.type, choices=a.choices, bounds=a.range),
             "required" if a.required else "optional",
             a.help or "",
         )
@@ -58,10 +59,14 @@ def _options_block(options: list[OptionInfo]) -> list[str]:
     return ["Options:", *align(rows)]
 
 
-def _command_section(path: str, command: Any, config: AgentErrorsConfig) -> list[str]:
+def _command_section(
+    path: str, command: Any, config: AgentErrorsConfig, *, brief: bool
+) -> list[str]:
     arguments, options = introspect.inventory(command, config)
     lines = [f"### {path}"]
     help_text = _help_text(command)
+    if brief:
+        help_text = _first_line(help_text)
     if help_text:
         lines += ["", help_text]
     for block in (_arguments_block(arguments), _options_block(options)):
@@ -114,18 +119,9 @@ def render_skill(
         wording.SKILL_COMMANDS,
     ]
     commands = _walk(root, prog)
-    if len(commands) > MAX_FULL_COMMANDS:
-        lines += [
-            "",
-            wording.SKILL_TOO_MANY.format(count=len(commands), command_path=prog),
-        ]
-        lines += [
-            "",
-            *align((path, _first_line(_help_text(c))) for path, c in commands),
-        ]
-    else:
-        for path, command in commands:
-            lines += ["", *_command_section(path, command, cfg)]
+    brief = len(commands) > MAX_FULL_HELP_COMMANDS
+    for path, command in commands:
+        lines += ["", *_command_section(path, command, cfg, brief=brief)]
     lines += [
         "",
         wording.SKILL_ON_ERRORS,

@@ -111,7 +111,7 @@ Errors are the reactive channel. `myapp --agent-skill` prints an [Agent Skill](h
 myapp --agent-skill > .claude/skills/myapp/SKILL.md
 ```
 
-`render_skill(app)` returns the same text as a string. The library never writes files itself.
+`render_skill(app)` returns the same text as a string. The library never writes files itself. Every command keeps its arguments, options and example regardless of size; above 10 commands only the first line of each command's help is kept.
 
 ## Repeat-failure escalation (opt-in)
 
@@ -123,7 +123,7 @@ All agent-facing text lives in `typer_agentic/wording.py`. If you customise it, 
 
 ## Compatibility
 
-- Python 3.11+, `typer>=0.24`, no other runtime dependency. `click` is never imported unconditionally.
+- Python 3.11+, `typer>=0.24`, no other runtime dependency. External `click` is imported only when Typer does not vendor Click (< 0.26) or when something else in the process has already imported it; a vendored-Click app never pays for it.
 - Typer 0.26+ bundles its own Click under `typer._click`; its exception classes are unrelated to `click.exceptions`. `typer_agentic.compat` resolves whichever hierarchies are present and catches all of them.
 - If resolution fails on some future Typer, `agent_errors(app)` becomes a transparent passthrough and emits one `RuntimeWarning` per process (only in agent mode). Your CLI keeps working; only the feature degrades.
 - Agent mode drives Click's `make_context` / `invoke` loop directly (not `main(standalone_mode=False)`, whose return value cannot distinguish `typer.Exit(n)` from a command returning `n`), so exit codes match stock Typer: `Exit(n)` → `n`, normal return → 0, `Abort` → 1, Ctrl-C → 130. Shell completion is delegated to Typer untouched.

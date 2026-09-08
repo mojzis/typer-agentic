@@ -112,7 +112,7 @@ cmd = "pytest -o addopts= -x -qq --tb=line --no-header -n auto"
 help = "Fail-fast tests: no coverage, minimal output, parallel (used by `check`)"
 
 [tool.poe.tasks.test-compat]
-shell = "uv run --no-project --refresh-package typer-agentic --with 'typer==0.25.*' --with pytest --with . pytest tests -q -o addopts= -p no:cacheprovider"
+shell = "uv run --no-project --with 'typer==0.25.*' --with pytest --with-editable . pytest tests -q -o addopts= -p no:cacheprovider"
 interpreter = "bash"
 help = "Run the suite against Typer 0.25 (external Click) — the pre-vendoring baseline"
 
@@ -204,6 +204,10 @@ extend_check = [
 
 [tool.biston.scan]
 exclude = ["tests/**", "**/conftest.py"]
+
+[tool.zorilla.rules.ZR003]
+# tests/conftest.py `golden()` asserts the text against the golden file.
+extra_helpers = ["golden"]
 
 [tool.zorilla.rules.ZR005]
 # tests/test_compat.py fakes sys.argv[0] to check program-name detection; the path is test data.

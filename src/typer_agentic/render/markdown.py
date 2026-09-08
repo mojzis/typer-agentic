@@ -5,17 +5,38 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 from .. import wording
-from ..payload import ArgumentInfo, ErrorPayload, OptionInfo, SubcommandInfo
+from ..introspect import RANGE_SUFFIX
+from ..payload import (
+    ArgumentInfo,
+    ErrorPayload,
+    OptionInfo,
+    RangeInfo,
+    SubcommandInfo,
+)
 
 MAX_OPTIONS = 20
 INDENT = "  "
 EXAMPLE_INDENT = "    "
 
 
-def type_label(type_name: str, choices: list[str] | None) -> str:
+def type_label(
+    type_name: str,
+    *,
+    choices: list[str] | None = None,
+    bounds: RangeInfo | None = None,
+) -> str:
+    """``CHOICE[a|b]``, ``INTEGER[1..365]`` or the bare normalised type name."""
     if choices:
         return f"CHOICE[{'|'.join(choices)}]"
+    if bounds is not None:
+        low = _endpoint(bounds.min, bounds.min_open, ">")
+        high = _endpoint(bounds.max, bounds.max_open, "<")
+        return f"{type_name.removesuffix(RANGE_SUFFIX)}[{low}..{high}]"
     return type_name
+
+
+def _endpoint(value: int | float | None, is_open: bool, marker: str) -> str:
+    return "" if value is None else f"{marker if is_open else ''}{value}"
 
 
 def option_names(opt: OptionInfo) -> str:
@@ -25,7 +46,7 @@ def option_names(opt: OptionInfo) -> str:
 def option_type_label(opt: OptionInfo) -> str:
     if opt.is_flag and not opt.choices:
         return "flag"
-    label = type_label(opt.type, opt.choices)
+    label = type_label(opt.type, choices=opt.choices, bounds=opt.range)
     return f"{label} (required)" if opt.required else label
 
 
@@ -88,7 +109,7 @@ def _argument_line(args: list[ArgumentInfo], *, required: bool) -> list[str]:
 
 def argument_label(arg: ArgumentInfo) -> str:
     """``PATH`` when the metavar already says the type, else ``NAME (TYPE)``."""
-    label = type_label(arg.type, arg.choices)
+    label = type_label(arg.type, choices=arg.choices, bounds=arg.range)
     return arg.metavar if label == arg.metavar else f"{arg.metavar} ({label})"
 
 

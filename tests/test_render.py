@@ -8,9 +8,16 @@ import re
 import pytest
 
 from typer_agentic import AgentErrorsConfig, render_json, render_markdown, wording
-from typer_agentic.payload import ErrorInfo, ErrorPayload, OptionInfo, RecoveryCopy
+from typer_agentic.payload import (
+    ErrorInfo,
+    ErrorPayload,
+    OptionInfo,
+    RangeInfo,
+    RecoveryCopy,
+)
+from typer_agentic.render.markdown import type_label
 
-from .conftest import VENDORED_CLICK, CliResult, golden, golden_only
+from .conftest import CliResult, golden, golden_only
 
 CASES = {
     "no_such_option.md": ["sync", "--verbos"],
@@ -34,30 +41,30 @@ def test_markdown_golden(run, agent, name: str, argv: list[str]) -> None:
 @pytest.mark.parametrize(("name", "argv"), list(CASES.items()), ids=list(CASES))
 def test_deescalation_invariants(run, agent, name: str, argv: list[str]) -> None:
     text: str = run(argv, config=agent).err
-    assert text.startswith("✗ Usage error in `myapp")
-    assert wording.CLASSIFICATION in text
-    assert wording.DIRECTIVE in text
+    assert text.startswith("✗ Usage error in `myapp"), "sentinel header"
+    assert wording.CLASSIFICATION in text, "classification sentence"
+    assert wording.DIRECTIVE in text, "directive sentence"
     assert text.count("```") == 2, "exactly one fenced example"
     framing = text.split("\n\n")[1]
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", framing.strip()) if s]
-    assert len(sentences) <= 2
-    assert "!" not in text.replace("✗", "")
-    assert "please" not in text.lower()
-    assert "Full reference: myapp" in text.splitlines()[-1]
+    assert len(sentences) <= 2, "framing paragraph is at most two sentences"
+    assert "!" not in text.replace("✗", ""), "no exclamation marks"
+    assert "please" not in text.lower(), "no pleading"
+    assert "Full reference: myapp" in text.splitlines()[-1], "footer last"
     assert not re.search(r"\x1b\[|[─│╭╮╰╯]", text), "no ANSI, no box drawing"
 
 
 def test_no_such_option_specifics(run, agent) -> None:
     text: str = run(["sync", "--verbos"], config=agent).err
-    assert "Did you mean: --verbose\n" in text
+    assert "Did you mean: --verbose\n" in text, "single best suggestion"
     assert (
         "--no-verbose" not in text.split("Did you mean")[1].split("\n", maxsplit=1)[0]
-    )
-    assert "\n```\nmyapp sync ./PATH --verbose\n```\n" in text
-    assert "CHOICE[dev|prod]" in text
-    assert "INTEGER" in text
-    assert "Required arguments: PATH" in text
-    assert len(text.splitlines()) <= 30
+    ), "secondary flag never suggested"
+    assert "\n```\nmyapp sync ./PATH --verbose\n```\n" in text, "corrected example"
+    assert "CHOICE[dev|prod]" in text, "choices rendered"
+    assert "INTEGER" in text, "types rendered"
+    assert "Required arguments: PATH" in text, "argument line"
+    assert len(text.splitlines()) <= 30, "line budget"
 
 
 def test_json_parseable_with_schema_fields(run) -> None:
@@ -65,24 +72,24 @@ def test_json_parseable_with_schema_fields(run) -> None:
     result: CliResult = run(
         ["sync", "--verbos"], config=cfg, env={"AGENT_ERRORS_FORMAT": "json"}
     )
-    assert result.code == 2
-    assert result.err.endswith("}\n")
+    assert result.code == 2, "exit code"
+    assert result.err.endswith("}\n"), "newline-terminated object"
     data = json.loads(result.err)
-    assert data["schema"] == "typer-agentic/v1"
-    assert data["error"]["type"] == "no_such_option"
-    assert "--verbos" in data["error"]["message"]
-    assert data["error"]["offending"] == "--verbos"
-    assert data["error"]["param"] is None
-    assert data["suggestions"][0] == "--verbose"
-    assert data["command_path"] == "myapp sync"
-    assert data["exit_code"] == 2
-    assert data["example"] == "myapp sync ./PATH --verbose"
+    assert data["schema"] == "typer-agentic/v1", "schema id"
+    assert data["error"]["type"] == "no_such_option", "error type"
+    assert "--verbos" in data["error"]["message"], "message names token"
+    assert data["error"]["offending"] == "--verbos", "offending token"
+    assert data["error"]["param"] is None, "no param for unknown option"
+    assert data["suggestions"][0] == "--verbose", "best suggestion first"
+    assert data["command_path"] == "myapp sync", "command path"
+    assert data["exit_code"] == 2, "exit code field"
+    assert data["example"] == "myapp sync ./PATH --verbose", "example"
     assert set(data["recovery"]) == {
         "classification",
         "directive",
         "action",
         "escalation",
-    }
+    }, "recovery keys"
     assert set(data) == {
         "schema",
         "error",
@@ -94,9 +101,17 @@ def test_json_parseable_with_schema_fields(run) -> None:
         "example",
         "recovery",
         "exit_code",
-    }
-    if VENDORED_CLICK:
-        golden("no_such_option.json", result.err)
+    }, "top-level keys"
+
+
+@golden_only
+def test_json_golden(run) -> None:
+    result: CliResult = run(
+        ["sync", "--verbos"],
+        config=AgentErrorsConfig(mode="agent"),
+        env={"AGENT_ERRORS_FORMAT": "json"},
+    )
+    golden("no_such_option.json", result.err)
 
 
 def test_json_config_format(run) -> None:
@@ -158,3 +173,22 @@ def test_markdown_omits_empty_sections_and_example() -> None:
 def test_json_matches_to_dict() -> None:
     payload = _payload([])
     assert json.loads(render_json(payload)) == payload.to_dict()
+
+
+@pytest.mark.parametrize(
+    ("type_name", "bounds", "expected"),
+    [
+        ("INTEGER RANGE", RangeInfo(min=1), "INTEGER[1..]"),
+        ("INTEGER RANGE", RangeInfo(max=365), "INTEGER[..365]"),
+        ("INTEGER RANGE", RangeInfo(min=1, max=365), "INTEGER[1..365]"),
+        ("FLOAT RANGE", RangeInfo(min=0.0, max=1.0), "FLOAT[0.0..1.0]"),
+        ("INTEGER RANGE", RangeInfo(min=1, max=10, min_open=True), "INTEGER[>1..10]"),
+        ("INTEGER RANGE", RangeInfo(max=10, max_open=True), "INTEGER[..<10]"),
+        ("INTEGER RANGE", None, "INTEGER RANGE"),
+        ("INTEGER", None, "INTEGER"),
+    ],
+)
+def test_type_label_shows_range_bounds(
+    type_name: str, bounds: RangeInfo | None, expected: str
+) -> None:
+    assert type_label(type_name, bounds=bounds) == expected

@@ -32,9 +32,10 @@ def sync(
 def push(
     target: str,
     tags: Annotated[list[str], typer.Option(help="Tags.")] = [],
+    retries: Annotated[int, typer.Option(min=0, max=5, help="Retry budget.")] = 0,
 ) -> None:
     """Push to a target."""
-    typer.echo(f"pushed {target} {tags}")
+    typer.echo(f"pushed {target} {tags} {retries}")
 
 
 @app.command()

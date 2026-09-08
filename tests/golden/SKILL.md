@@ -37,7 +37,8 @@ Arguments:
   TARGET  TEXT  required
 
 Options:
-  --tags  TEXT  Tags.
+  --tags     TEXT           Tags.
+  --retries  INTEGER[0..5]  Retry budget.
 
 Example:
 

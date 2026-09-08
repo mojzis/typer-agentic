@@ -41,7 +41,7 @@ def _run(app: Any, config: AgentErrorsConfig, argv: list[str]) -> Any:
         sys.stdout.write(render_skill(app, config=config))
         sys.stdout.flush()
         sys.exit(0)
-    status = compat.STATUS
+    status = compat.current()
     if mode == "human" or not status.ok:
         if mode == "agent":
             compat.warn_unsupported_once(status)
@@ -69,7 +69,7 @@ def _run_agent(app: Any, config: AgentErrorsConfig, args: list[str]) -> Any:
     int from ``Exit(code)``, so we drive ``make_context``/``invoke`` ourselves
     and get standalone exit-code semantics exactly.
     """
-    status = compat.STATUS
+    status = compat.current()
     command = compat.get_command(app)
     prog_name = compat.detect_program_name()
     if _completion_requested(prog_name):

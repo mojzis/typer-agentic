@@ -7,7 +7,7 @@ import typer
 from typer_agentic import AgentErrorsConfig, render_skill, wording
 
 from . import fixture_app
-from .conftest import VENDORED_CLICK, CliResult, golden
+from .conftest import CliResult, golden, golden_only
 
 
 def _frontmatter(text: str) -> dict[str, str]:
@@ -22,8 +22,11 @@ def test_flag_prints_skill_and_exits_zero(run) -> None:
     assert result.code == 0
     assert result.err == ""
     assert result.out == render_skill(fixture_app.app, prog_name="myapp")
-    if VENDORED_CLICK:
-        golden("SKILL.md", result.out)
+
+
+@golden_only
+def test_skill_golden(run) -> None:
+    golden("SKILL.md", run(["--agent-skill"]).out)
 
 
 def test_flag_works_even_with_broken_argv(run) -> None:
@@ -35,16 +38,18 @@ def test_flag_works_even_with_broken_argv(run) -> None:
 def test_frontmatter_and_inventory() -> None:
     text = render_skill(fixture_app.app, prog_name="myapp")
     meta = _frontmatter(text)
-    assert meta == {"name": "myapp", "description": "Demo tool for tests."}
-    assert "### myapp sync" in text
-    assert "--verbose, -v" in text
-    assert "--count        INTEGER" in text
-    assert "--env          CHOICE[dev|prod]" in text
-    assert "--secret" not in text
-    assert "--help" not in text
+    assert meta == {"name": "myapp", "description": "Demo tool for tests."}, (
+        "frontmatter"
+    )
+    assert "### myapp sync" in text, "command heading"
+    assert "--verbose, -v" in text, "all option names"
+    assert "--count        INTEGER" in text, "aligned type column"
+    assert "--env          CHOICE[dev|prod]" in text, "choices rendered"
+    assert "--secret" not in text, "hidden option excluded"
+    assert "--help" not in text, "built-in help excluded"
     assert text.count("```") == 2 * 6, "one fenced example per command"
-    assert wording.CLASSIFICATION in text and wording.DIRECTIVE in text
-    assert wording.EXAMPLE_NOTE in text
+    assert wording.CLASSIFICATION in text and wording.DIRECTIVE in text, "copy"
+    assert wording.EXAMPLE_NOTE in text, "example note"
 
 
 def test_custom_name_description_and_quoting() -> None:
@@ -70,21 +75,49 @@ def test_hidden_included_when_configured() -> None:
     assert "--secret" in text
 
 
-def test_nested_groups_and_budget() -> None:
+def _big_app(commands: int = 11) -> typer.Typer:
     app = typer.Typer(help="Big app.")
     group = typer.Typer(help="Group.")
     app.add_typer(group, name="grp")
-    for i in range(11):
+    for i in range(commands):
 
-        def _cmd() -> None:
-            """Numbered."""
+        def _cmd(name: str, count: int = typer.Option(1, help="How many.")) -> None:
+            """Numbered.
+
+            A longer body that only fits when the CLI is small.
+            """
 
         group.command(name=f"c{i}")(_cmd)
-    text = render_skill(app, prog_name="big")
-    assert "This CLI has 11 commands" in text
-    assert "  big grp c10  Numbered." in text
-    assert "```" not in text
-    assert len(text.splitlines()) < 200
+    return app
+
+
+def test_above_cap_keeps_inventory_per_command() -> None:
+    text = render_skill(_big_app(), prog_name="big")
+    assert "### big grp c10" in text
+    assert "  NAME  TEXT  required" in text
+    assert "  --count  INTEGER  How many." in text
+    assert text.count("```") == 2 * 11, "one fenced example per command"
+
+
+def test_above_cap_trims_help_to_first_line() -> None:
+    text = render_skill(_big_app(), prog_name="big")
+    assert "Numbered." in text
+    assert "A longer body" not in text
+
+
+def test_help_body_kept_below_cap() -> None:
+    app = typer.Typer()
+
+    @app.command()
+    def one() -> None:
+        """First line.
+
+        Body paragraph.
+        """
+
+    text = render_skill(app, prog_name="small")
+    assert "First line." in text
+    assert "Body paragraph." in text
 
 
 def test_single_command_app() -> None:

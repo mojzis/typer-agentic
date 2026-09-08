@@ -19,6 +19,7 @@ from .payload import (
     RecoveryCopy,
     SubcommandInfo,
 )
+from .render.markdown import type_label
 
 _NO_SUCH_COMMAND = re.compile(r"No such command '(?P<name>[^']*)'")
 _DID_YOU_MEAN = re.compile(r"\s*Did you mean .*\?$")
@@ -48,8 +49,9 @@ _BY_MESSAGE: tuple[tuple[re.Pattern[str], ErrorType], ...] = (
 
 def classify(exc: BaseException) -> ErrorType:
     """Best-effort stable error type for any resolvable usage error."""
+    status = compat.current()
     for class_name, error_type in _BY_CLASS:
-        if isinstance(exc, compat.STATUS.get(class_name)):
+        if isinstance(exc, status.get(class_name)):
             return error_type
     message = str(getattr(exc, "message", exc))
     for pattern, error_type in _BY_MESSAGE:
@@ -208,16 +210,16 @@ def _bad_parameter(inp: _Inputs) -> Analysis:
                 choices=", ".join(choices)
             ),
         )
-    type_name = (
-        target_option.type
-        if target_option
-        else introspect.normalise_type_name(getattr(param, "type", None))
-    )
+    if target_option:
+        type_name, bounds = target_option.type, target_option.range
+    else:
+        type_name, bounds = introspect.type_and_range(param)
     return Analysis(
         [],
         example=inp.example(fix=Fix(target_option)),
         action=wording.ACTION_BAD_PARAMETER.format(
-            param=_display_name(param, inp.error.param), type=type_name
+            param=_display_name(param, inp.error.param),
+            type=type_label(type_name, bounds=bounds),
         ),
     )
 

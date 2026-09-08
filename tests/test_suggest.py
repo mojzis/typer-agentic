@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import pytest
+
 from typer_agentic import AgentErrorsConfig, suggest
-from typer_agentic.example import Fix, build_example
-from typer_agentic.payload import ArgumentInfo, OptionInfo
+from typer_agentic.example import Fix, build_example, placeholder
+from typer_agentic.payload import ArgumentInfo, OptionInfo, RangeInfo
 
 
 def test_unknown_subcommand(json_payload) -> None:
     data = json_payload(["synk"])
-    assert data["error"]["type"] == "no_such_command"
-    assert data["error"]["offending"] == "synk"
-    assert data["suggestions"][0] == "sync"
-    assert data["example"] == "myapp sync"
-    assert [s["name"] for s in data["subcommands"]][:3] == ["sync", "push", "fail"]
-    assert "Did you mean" not in data["error"]["message"]
+    assert data["error"]["type"] == "no_such_command", "error type"
+    assert data["error"]["offending"] == "synk", "offending token"
+    assert data["suggestions"][0] == "sync", "best suggestion"
+    assert data["example"] == "myapp sync", "example uses the suggestion"
+    assert [s["name"] for s in data["subcommands"]][:3] == ["sync", "push", "fail"], (
+        "subcommand table in declaration order"
+    )
+    assert "Did you mean" not in data["error"]["message"], "Typer hint stripped"
 
 
 def test_bad_choice(json_payload) -> None:
@@ -103,6 +107,27 @@ def test_example_placeholders() -> None:
         build_example("app", [], [], fix=Fix(options[3], "2020-02-02"))
         == "app --dt 2020-02-02"
     )
+
+
+@pytest.mark.parametrize(
+    ("bounds", "expected"),
+    [
+        (RangeInfo(min=1), "1"),
+        (RangeInfo(max=365), "365"),
+        (RangeInfo(min=1, max=365), "1"),
+        (RangeInfo(min=0.0, max=1.0), "0.0"),
+        (RangeInfo(min=1, min_open=True), "2"),
+        (RangeInfo(min=1, max=2, min_open=True, max_open=True), "1"),  # no safe pick
+        (RangeInfo(min=0.5, min_open=True), "1.0"),  # no safe pick for floats
+    ],
+)
+def test_range_placeholder_is_inside_bounds(bounds: RangeInfo, expected: str) -> None:
+    type_ = (
+        "FLOAT RANGE"
+        if isinstance(bounds.min or bounds.max, float)
+        else "INTEGER RANGE"
+    )
+    assert placeholder(type_, bounds=bounds) == expected
 
 
 def test_option_tokens_nargs() -> None:

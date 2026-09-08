@@ -9,7 +9,7 @@ from pathlib import PurePath
 from typing import Any
 
 from .config import END_OF_OPTIONS, AgentErrorsConfig
-from .payload import ArgumentInfo, OptionInfo, SubcommandInfo
+from .payload import ArgumentInfo, OptionInfo, RangeInfo, SubcommandInfo
 
 _TYPE_ALIASES = {
     "INT": "INTEGER",
@@ -19,6 +19,8 @@ _TYPE_ALIASES = {
     "FILENAME": "FILE",
     "INT RANGE": "INTEGER RANGE",
 }
+RANGE_SUFFIX = " RANGE"
+"""Normalised-name suffix shared by ``INTEGER RANGE`` and ``FLOAT RANGE``."""
 _SKIPPED_OPTIONS = frozenset({"help", "install_completion", "show_completion"})
 _SCALARS = (bool, int, float, str)
 
@@ -35,6 +37,32 @@ def choices_of(param: Any) -> list[str] | None:
     if raw is None:
         return None
     return [_choice_str(c) for c in raw]
+
+
+def range_of(param: Any) -> RangeInfo | None:
+    """Bounds of an ``IntRange``/``FloatRange`` param type, else ``None``."""
+    param_type = getattr(param, "type", None)
+    if not normalise_type_name(param_type).endswith(RANGE_SUFFIX):
+        return None
+    low = _numeric(getattr(param_type, "min", None))
+    high = _numeric(getattr(param_type, "max", None))
+    if low is None and high is None:
+        return None
+    return RangeInfo(
+        min=low,
+        max=high,
+        min_open=bool(getattr(param_type, "min_open", False)),
+        max_open=bool(getattr(param_type, "max_open", False)),
+    )
+
+
+def _numeric(value: Any) -> int | float | None:
+    return value if isinstance(value, (int, float)) else None
+
+
+def type_and_range(param: Any) -> tuple[str, RangeInfo | None]:
+    """Normalised type name plus its bounds, for any Click parameter."""
+    return normalise_type_name(getattr(param, "type", None)), range_of(param)
 
 
 def _choice_str(choice: Any) -> str:
@@ -81,23 +109,26 @@ def _is_argument(param: Any) -> bool:
 
 def argument_info(param: Any) -> ArgumentInfo:
     name = str(param.name)
+    type_name, bounds = type_and_range(param)
     return ArgumentInfo(
         name=name,
         metavar=str(getattr(param, "metavar", None) or name.upper()),
-        type=normalise_type_name(param.type),
+        type=type_name,
         required=bool(getattr(param, "required", False)),
         nargs=int(getattr(param, "nargs", 1) or 1),
         help=getattr(param, "help", None) or None,
         choices=choices_of(param),
+        range=bounds,
     )
 
 
 def option_info(param: Any) -> OptionInfo:
     primary = list(getattr(param, "opts", []) or [])
     secondary = list(getattr(param, "secondary_opts", []) or [])
+    type_name, bounds = type_and_range(param)
     return OptionInfo(
         names=[*primary, *secondary],
-        type=normalise_type_name(param.type),
+        type=type_name,
         required=bool(getattr(param, "required", False)),
         default=sanitise_default(param),
         multiple=bool(getattr(param, "multiple", False)),
@@ -105,6 +136,7 @@ def option_info(param: Any) -> OptionInfo:
         choices=choices_of(param),
         help=getattr(param, "help", None) or None,
         nargs=int(getattr(param, "nargs", 1) or 1),
+        range=bounds,
         primary=primary,
     )
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Range bounds: `typer.Option(min=..., max=...)` params render as `INTEGER[1..]` / `INTEGER[1..365]` / `FLOAT[0.0..1.0]` in error blocks and SKILL.md; JSON payloads gain a `range` field on arguments and options (`null` when not a range).
+- SKILL.md no longer collapses to a bare command list above 10 commands: every command keeps its arguments, options and example; only the help body is trimmed to its first line. `wording.SKILL_TOO_MANY` removed (no longer used).
+- External `click` is no longer imported on Typer >= 0.26 unless something else already loaded it (saves ~5-9 ms per process). `compat.current()` picks up a late import.
+
 ## 0.1.0
 
 Initial release.

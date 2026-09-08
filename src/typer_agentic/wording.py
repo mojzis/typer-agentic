@@ -56,7 +56,3 @@ ESCALATION_THIRD = (
 SKILL_WHEN_TO_USE = "## When to use"
 SKILL_COMMANDS = "## Commands"
 SKILL_ON_ERRORS = "## On usage errors"
-SKILL_TOO_MANY = (
-    "This CLI has {count} commands. Run `{command_path} --help` for each one "
-    "before using it."
-)
