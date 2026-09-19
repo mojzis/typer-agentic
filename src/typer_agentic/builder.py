@@ -288,12 +288,11 @@ def _action_text(analysis: Analysis, command_path: str) -> str:
     return analysis.action + wording.ACTION_EXAMPLE_SUFFIX
 
 
-def _recovery(action: str, escalation: str | None = None) -> RecoveryCopy:
+def _recovery(action: str) -> RecoveryCopy:
     return RecoveryCopy(
         classification=wording.CLASSIFICATION,
         directive=wording.DIRECTIVE,
         action=action,
-        escalation=escalation,
     )
 
 
