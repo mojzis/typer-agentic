@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import typer
+from typer.core import TyperOption
 
 from typer_agentic import AgentErrorsConfig, compat
 
@@ -18,8 +19,10 @@ PROG = "myapp"
 VENDORED_CLICK = bool(compat.STATUS.sources) and compat.STATUS.sources[0].startswith(
     "typer._click"
 )
+PYDANTIC_TYPER = hasattr(TyperOption, "get_runtime_param")
+"""Typer >= 0.29: pydantic coercion, whose error wording the golden files record."""
 golden_only = pytest.mark.skipif(
-    not VENDORED_CLICK, reason="golden files use Typer >= 0.26 (vendored Click) wording"
+    not PYDANTIC_TYPER, reason="golden files use Typer >= 0.29 (pydantic) wording"
 )
 GOLDEN_DIR = Path(__file__).parent / "golden"
 

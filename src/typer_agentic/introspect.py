@@ -5,8 +5,10 @@ from __future__ import annotations
 import contextlib
 import enum
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from pathlib import PurePath
-from typing import Any
+from typing import Any, get_args
+from uuid import UUID
 
 from .config import END_OF_OPTIONS, AgentErrorsConfig
 from .payload import ArgumentInfo, OptionInfo, RangeInfo, SubcommandInfo
@@ -23,24 +25,92 @@ RANGE_SUFFIX = " RANGE"
 """Normalised-name suffix shared by ``INTEGER RANGE`` and ``FLOAT RANGE``."""
 _SKIPPED_OPTIONS = frozenset({"help", "install_completion", "show_completion"})
 _SCALARS = (bool, int, float, str)
+_ANNOTATION_NAMES: dict[Any, str] = {
+    bool: "BOOL",
+    int: "INTEGER",
+    float: "FLOAT",
+    str: "TEXT",
+    datetime: "DATETIME",
+    UUID: "UUID",
+}
+_PATH_NAMES = {"file": "FILE", "dir": "DIRECTORY", "path": "PATH"}
+"""typer>=0.29 ``TypeDescriptor.path_type`` -> the name Click's ``Path`` type used."""
+
+
+def _descriptor(param: Any) -> Any | None:
+    """Typer >= 0.29 ``TypeDescriptor``, or ``None`` on Click-typed params."""
+    return getattr(param, "type_descriptor", None)
+
+
+def _element(desc: Any) -> Any:
+    """The annotation with a ``list[...]`` wrapper removed."""
+    if desc.is_list:
+        (annotation,) = get_args(desc.annotation)
+        return annotation
+    return desc.annotation
+
+
+def _is_ranged(desc: Any) -> bool:
+    """``TypeDescriptor.is_ranged`` ignores ``list[int]``; Click's IntRange did not."""
+    info = desc.parameter_info
+    bounded = info.min is not None or info.max is not None
+    return _element(desc) in (int, float) and bounded
+
+
+def _descriptor_type_name(desc: Any) -> str:
+    """The name older Typer's Click param type had, from a ``TypeDescriptor``."""
+    if desc.is_choice:
+        return "CHOICE"
+    if desc.is_file:
+        return "FILE"
+    annotation = _element(desc)
+    if desc.is_tuple:
+        names = (_scalar_type_name(desc, arg) for arg in get_args(annotation))
+        return f"<{' '.join(names)}>"
+    name = _scalar_type_name(desc, annotation)
+    return name + RANGE_SUFFIX if _is_ranged(desc) else name
+
+
+def _scalar_type_name(desc: Any, annotation: Any) -> str:
+    is_path_class = isinstance(annotation, type) and issubclass(annotation, PurePath)
+    if desc.is_path or is_path_class:
+        return _PATH_NAMES.get(desc.path_type, "PATH")
+    if annotation in _ANNOTATION_NAMES:
+        return _ANNOTATION_NAMES[annotation]
+    name = str(getattr(annotation, "__name__", None) or annotation).upper()
+    return _TYPE_ALIASES.get(name, name)
+
+
+def _descriptor_range(desc: Any) -> RangeInfo | None:
+    """Typer >= 0.29 keeps ``min``/``max`` on ``ParameterInfo``; bounds are closed."""
+    if not _is_ranged(desc):
+        return None
+    info = desc.parameter_info
+    return RangeInfo(min=_numeric(info.min), max=_numeric(info.max))
 
 
 def normalise_type_name(param_type: Any) -> str:
     """Stable, version-independent upper-case type name (``INTEGER``, ``TEXT``)."""
     raw = getattr(param_type, "name", None) or type(param_type).__name__
     name = str(raw).upper()
+    if name.startswith("<") and name.endswith(">"):
+        # Click's Tuple type is named "<str int>"; alias each member.
+        members = (_TYPE_ALIASES.get(m, m) for m in name[1:-1].split())
+        return f"<{' '.join(members)}>"
     return _TYPE_ALIASES.get(name, name)
 
 
 def choices_of(param: Any) -> list[str] | None:
-    raw = getattr(getattr(param, "type", None), "choices", None)
+    desc = _descriptor(param)
+    source = desc if desc is not None else getattr(param, "type", None)
+    raw = getattr(source, "choices", None)
     if raw is None:
         return None
     return [_choice_str(c) for c in raw]
 
 
 def range_of(param: Any) -> RangeInfo | None:
-    """Bounds of an ``IntRange``/``FloatRange`` param type, else ``None``."""
+    """Bounds of a Click ``IntRange``/``FloatRange`` param type, else ``None``."""
     param_type = getattr(param, "type", None)
     if not normalise_type_name(param_type).endswith(RANGE_SUFFIX):
         return None
@@ -62,6 +132,9 @@ def _numeric(value: Any) -> int | float | None:
 
 def type_and_range(param: Any) -> tuple[str, RangeInfo | None]:
     """Normalised type name plus its bounds, for any Click parameter."""
+    desc = _descriptor(param)
+    if desc is not None:
+        return _descriptor_type_name(desc), _descriptor_range(desc)
     return normalise_type_name(getattr(param, "type", None)), range_of(param)
 
 

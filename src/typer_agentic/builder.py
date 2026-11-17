@@ -29,6 +29,9 @@ _QUOTED_VALUE = re.compile(r"^'(?P<value>[^']*)'")
 # "Got unexpected extra argument(s) (extra)": the offending tokens are in the
 # *last* parenthesised group; the first one is the "(s)" of "argument(s)".
 _PARENS = re.compile(r"\((?P<inner>[^)]*)\)")
+# typer >= 0.29 validates with pydantic, whose custom-validator errors carry
+# this prefix ("Value error, 'prd' is not one of ..."); it is noise to an agent.
+_PYDANTIC_VALUE_ERROR = "Value error, "
 
 _BY_CLASS: tuple[tuple[str, ErrorType], ...] = (
     ("NoSuchOption", "no_such_option"),
@@ -72,6 +75,8 @@ def _message(exc: BaseException, error_type: ErrorType) -> str:
         text = str(getattr(exc, "message", exc))
     else:
         text = _format_message(exc)
+    if error_type == "bad_parameter":
+        text = text.replace(f": {_PYDANTIC_VALUE_ERROR}", ": ", 1)
     if error_type == "no_such_command":
         # Typer appends "Did you mean 'x'?" for subcommands; same reason.
         text = _DID_YOU_MEAN.sub("", text)
@@ -86,13 +91,33 @@ def _offending(exc: BaseException, error_type: ErrorType, message: str) -> str |
         match = _NO_SUCH_COMMAND.search(message)
         return match.group("name") if match else None
     if error_type == "bad_parameter":
-        # The raw message starts with the quoted value ("'prd' is not one of");
-        # the formatted one is prefixed with "Invalid value for '--env':".
-        match = _QUOTED_VALUE.match(str(getattr(exc, "message", "")))
-        return match.group("value") if match else None
+        # The raw message starts with the quoted value ("'prd' is not one of",
+        # after pydantic's prefix on typer >= 0.29); the formatted one is
+        # prefixed with "Invalid value for '--env':". Pydantic's own messages
+        # ("Input should be a valid integer") omit it: read the cause instead.
+        raw = str(getattr(exc, "message", "")).removeprefix(_PYDANTIC_VALUE_ERROR)
+        match = _QUOTED_VALUE.match(raw)
+        return match.group("value") if match else _validation_input(exc)
     if error_type == "bad_argument_usage":
         groups = _PARENS.findall(message)
         return groups[-1] if groups else None
+    return None
+
+
+def _validation_input(exc: BaseException) -> str | None:
+    """The rejected value of a typer >= 0.29 (pydantic) validation failure.
+
+    Typer chains the pydantic ``ValidationError`` as ``__cause__``; its message
+    ("Input should be a valid integer") no longer quotes the value. Duck-typed so
+    pydantic stays an indirect dependency.
+    """
+    errors = getattr(exc.__cause__, "errors", None)
+    if not callable(errors):
+        return None
+    details = errors()
+    if isinstance(details, list) and details and isinstance(details[0], dict):
+        value = details[0].get("input")
+        return None if value is None else str(value)
     return None
 
 

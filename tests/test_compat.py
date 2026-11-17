@@ -150,7 +150,7 @@ def test_resolve_failure_is_reported_not_raised() -> None:
 
 def test_resolve_missing_required_name_degrades() -> None:
     partial = ModuleType("partial")
-    partial.UsageError = type("UsageError", (Exception,), {})  # ty: ignore[unresolved-attribute]
+    partial.UsageError = type("UsageError", (Exception,), {})  # ty: ignore[missing-attribute]
 
     def importer(name: str) -> ModuleType:
         if name == "typer":
