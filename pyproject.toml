@@ -46,11 +46,11 @@ dev = [
     "vulture",
     "deptry",
     "poethepoet",
-    "ty-find>=0.5.4",
-    "biston>=0.7.6",
-    "madoqua>=0.2.11",
-    "gerenuk>=0.5.6",
-    "zorilla>=0.2.5",
+    "ty-find>=0.5.5",
+    "biston>=0.7.7",
+    "madoqua>=0.2.12",
+    "gerenuk>=0.5.7",
+    "zorilla>=0.2.6",
     "pycoati>=0.2.15",
 ]
 
