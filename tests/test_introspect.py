@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -157,6 +158,40 @@ def test_multiple_option_and_no_flag_pairs() -> None:
     assert by_name["--where"].required is True, "Ellipsis default means required"
     assert by_name["--where"].default is None, "required option has no default"
     assert by_name["--where"].type == "PATH", "Path type normalised"
+
+
+def test_type_names_match_across_typer_versions() -> None:
+    """Typer >= 0.29 drops Click param types; names must stay the Click ones."""
+    app = typer.Typer()
+
+    @app.command()
+    def cmd(  # noqa: PLR0917 -- one option per type under test
+        src: typer.FileText = typer.Option(...),
+        pair: tuple[str, int] = typer.Option(("a", 1)),
+        out: Path = typer.Option(Path(), file_okay=False),
+        cfg: Path = typer.Option(Path(), dir_okay=False),
+        paths: list[Path] = typer.Option([]),
+        ratio: float = typer.Option(0.5, min=0, max=1),
+        when: datetime = typer.Option(None),
+        ints: list[int] = typer.Option([], min=0, max=5),
+    ) -> None:
+        """Doc."""
+
+    _, options = introspect.inventory(get_command(app), AgentErrorsConfig())
+    by_name = {o.names[0]: o for o in options}
+    assert by_name["--ratio"].range == RangeInfo(min=0, max=1), "float bounds"
+    assert by_name["--ints"].range == RangeInfo(min=0, max=5), "list keeps bounds"
+    types = {name: o.type for name, o in by_name.items()}
+    assert types == {
+        "--src": "FILE",
+        "--pair": "<TEXT INTEGER>",
+        "--out": "DIRECTORY",
+        "--cfg": "FILE",
+        "--paths": "PATH",
+        "--ratio": "FLOAT RANGE",
+        "--when": "DATETIME",
+        "--ints": "INTEGER RANGE",
+    }
 
 
 @pytest.mark.parametrize(
